@@ -1,16 +1,48 @@
+const { ethers } = require("ethers");
+const { StreamrClient, StreamPermission } = require('streamr-client')
 const express = require("express");
+var bodyParser = require('body-parser')
+const cors = require('cors');
+
 const app = express();
 const port = 8080;
-const { StreamrClient, StreamPermission } = require('streamr-client')
-var bodyParser = require('body-parser')
-
 app.use(bodyParser.json())
+app.use(cors());
 
-const streamr = new StreamrClient({
-    auth: {
-        privateKey: '5056265d115db3541cc59265cf6ecb2eeb27dddca470c8c73ea1e199befbbd59',
-    },
-})
+const collectionAbi = require('./abi/collection.json')
+
+const PRIVATEKEY = '5056265d115db3541cc59265cf6ecb2eeb27dddca470c8c73ea1e199befbbd59'
+const PROJECT_ID = '8f9718edf04841699139f7e0fab41d66'
+
+const provider = new ethers.providers.JsonRpcProvider(`https://rinkeby.infura.io/v3/${PROJECT_ID}`)
+console.log({provider})
+
+const collectionAddress = "0xcC34C41FF8bCAAaA5B8964528243ba4798785ada" 
+const stakingAddress = "0xdBC168264b4e00d08fc0DE1198Bd44b8C85d390f"
+
+const wallet = new ethers.Wallet(PRIVATEKEY, provider)
+const signer = wallet.provider.getSigner(wallet.address)
+
+console.log({wallet})
+
+
+
+// mint social token
+async function aquireNFT() {
+  const owner = wallet.connect();
+  console.log({owner})
+  const nftContract = new ethers.Contract(
+    collectionAddress,
+    collectionAbi,
+  signer 
+  );
+  const mint = await nftContract.mint(
+    owner.address,
+    1
+  );
+  console.log("mint", mint);
+}
+
 
 
 app.get("/packet", (req, res) => {
@@ -21,12 +53,22 @@ app.get("/packet", (req, res) => {
 });
 
 app.post("/packet", async (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+console.log('wallet', req.body[0])
+  const provider = req.body.provider
 
-  console.log(req)
-  console.log(req.body)
+  
+const streamr = new StreamrClient({
+    auth: {
+         privateKey: req.body[0]
+    },
+})
+
+  // console.log(req)
+  // console.log(req.body)
     // update blockchain
 
- await publishToStreamr(req.body)
+ await publishToStreamr(streamr, req.body[1])
 
   res.send("Published");
 });
@@ -57,7 +99,7 @@ app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
 
-const publishToStreamr = async (packet) => {
+const publishToStreamr = async (streamr, packet) => {
   await streamr.publish('0x5b5269004dfd679dc7c85b0b8f153871f4f0986b/packet', packet)
 }
 
